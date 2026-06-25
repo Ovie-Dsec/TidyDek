@@ -5,7 +5,8 @@ subfolders. Runs as a background daemon with a single-instance IPC lock.
 
 ## Download
 
-[Download the latest TidyDek.exe](https://github.com/Ovie-Dsec/TidyDek/releases/latest)
+- [Download the latest TidyDek.exe](https://github.com/Ovie-Dsec/TidyDek/releases/latest)
+- 📹 [Watch TidyDek in Action](https://github.com/Ovie-Dsec/TidyDek/releases/download/v1.0.0/TIdyDek.in.Action.mp4)
 
 ## Quick Start
 
