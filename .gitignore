@@ -1,0 +1,25 @@
+# Build output
+dist/
+build/
+*.spec
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Certificates — NEVER commit these
+*.pfx
+*.pvk
+*.cer
+*.sst
+
+# MSIX package output
+AppxPackage/
+resources.pri
+AppxMap.xml
+
+# OS junk
+Thumbs.db
+.DS_Store
+Desktop.ini

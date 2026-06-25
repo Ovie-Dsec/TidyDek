@@ -1,0 +1,43 @@
+{
+  "name": "auto-folder-organizer",
+  "version": "1.0.0",
+  "description": "Auto Folder Organizer - Windows daemon that monitors directories and automatically organizes files into categorized subfolders",
+  "author": "Ovie Zeus",
+  "license": "MIT",
+  "scripts": {
+    "start": "python organizer.py",
+    "build": "pyinstaller --onefile --windowed --name AutoFolderOrganizer organizer.py",
+    "build:console": "pyinstaller --onefile --name AutoFolderOrganizer organizer.py"
+  },
+  "dependencies": {
+    "watchdog": ">=4.0.0"
+  },
+  "devDependencies": {
+    "pyinstaller": ">=6.0.0"
+  },
+  "configuration": {
+    "file_categories": {
+      "Documents": [".pdf", ".docx", ".doc", ".txt", ".xlsx", ".pptx", ".csv"],
+      "Images": [".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".bmp"],
+      "Videos": [".mp4", ".mkv", ".avi", ".mov", ".flv", ".wmv"],
+      "Audio": [".mp3", ".wav", ".flac", ".m4a", ".aac"],
+      "Archives": [".zip", ".rar", ".7z", ".tar", ".gz"],
+      "Installers": [".exe", ".msi", ".dmg", ".pkg", ".deb"]
+    },
+    "daemon_port": 65433,
+    "daemon_marker": "REGISTER_DIR:",
+    "pid_file": "~/.autofolderorganizer.lock",
+    "connection_retries": 3,
+    "retry_delay_seconds": 0.5,
+    "write_stream_settle_seconds": 0.5,
+    "server_timeout": 1.0,
+    "ready_timeout": 3,
+    "messagebox_timeout_ms": 3000,
+    "max_filename_buffer": 260
+  },
+  "registry": {
+    "run_key": "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+    "app_key": "Software\\AutoFolderOrganizer",
+    "uninstall_key": "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\AutoFolderOrganizer"
+  }
+}

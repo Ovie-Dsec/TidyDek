@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap rescap desktop">
+
+  <Identity
+    Name="YourCompany.TidyDek"
+    Publisher="CN=YourWindowsDeveloperPublisherID"
+    Version="1.4.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>TidyDek</DisplayName>
+    <PublisherDisplayName>YourCompany</PublisherDisplayName>
+    <Description>Automatically organizes files and folders into categorized directories. Monitors the filesystem and moves files by type — documents, images, video, audio, archives, installers, code, and design assets — plus relocates user-created folders into a master Folders directory.</Description>
+    <Logo>assets\Logo.png</Logo>
+  </Properties>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Capabilities>
+    <rescap:Capability Name="broadFileSystemAccess" />
+  </Capabilities>
+
+  <Applications>
+    <Application
+      Id="TidyDek"
+      Executable="TidyDek.exe"
+      EntryPoint="Windows.FullTrustApplication">
+
+      <uap:VisualElements
+        DisplayName="TidyDek"
+        Description="Automatically organizes files and folders into categorized directories."
+        Square150x150Logo="assets\Logo.png"
+        Square44x44Logo="assets\Logo.png"
+        BackgroundColor="transparent">
+      </uap:VisualElements>
+
+      <Extensions>
+        <desktop:Extension
+          Category="windows.startupTask"
+          Executable="TidyDek.exe"
+          EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask
+            TaskId="TidyDekStartup"
+            Enabled="true"
+            DisplayName="TidyDek File Organizer" />
+        </desktop:Extension>
+      </Extensions>
+
+    </Application>
+  </Applications>
+
+</Package>
