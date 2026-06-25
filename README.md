@@ -11,8 +11,8 @@ subfolders. Runs as a background daemon with a single-instance IPC lock.
 ## Quick Start
 
 1. Download `TidyDek.exe` from the Releases page
-2. Run it — it watches its own directory
-3. Drop files into that folder — they sort automatically
+2. Run it, it watches its own directory
+3. Drop files into that folder, they sort automatically
 
 ## Features
 
