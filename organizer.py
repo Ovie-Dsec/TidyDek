@@ -41,7 +41,7 @@ if sys.platform == "win32":
 
 APP_NAME = "AutoFolderOrganizer"
 APP_AUTHOR = "Ovie Zeus"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 
 REGISTRY_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REGISTRY_RUN_VALUE = APP_NAME
