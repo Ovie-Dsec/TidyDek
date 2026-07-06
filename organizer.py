@@ -41,7 +41,7 @@ if sys.platform == "win32":
 
 APP_NAME = "AutoFolderOrganizer"
 APP_AUTHOR = "Ovie Zeus"
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 
 REGISTRY_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REGISTRY_RUN_VALUE = APP_NAME
@@ -52,6 +52,7 @@ UNINSTALL_REG_KEY = (
 
 DAEMON_PORT = 65433
 DAEMON_MARKER = "REGISTER_DIR:"
+LOG_FILENAME = "organizer.log"
 
 PID_FILE = os.path.join(os.path.expanduser("~"), f"{APP_NAME}.lock")
 
@@ -451,7 +452,7 @@ def move_file(filepath, script_dir, script_name):
         return
 
     filename = os.path.basename(filepath)
-    if filename == script_name:
+    if filename == script_name or filename == LOG_FILENAME:
         return
 
     _, ext = os.path.splitext(filename)
@@ -570,7 +571,7 @@ def organize_existing(script_dir, script_name):
     for item in os.listdir(script_dir):
         item_path = os.path.join(script_dir, item)
 
-        if item == script_name:
+        if item == script_name or item == LOG_FILENAME:
             continue
 
         if is_protected_name(item):
