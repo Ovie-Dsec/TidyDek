@@ -411,6 +411,8 @@ def get_unique_path(dest_path):
     If *dest_path* already exists, append _1, _2, etc. to create a
     unique file or directory name.
     """
+    if not os.path.exists(dest_path):
+        return dest_path
     base, ext = os.path.splitext(dest_path)
     counter = 1
     while True:
