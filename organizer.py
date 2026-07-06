@@ -41,7 +41,7 @@ if sys.platform == "win32":
 
 APP_NAME = "AutoFolderOrganizer"
 APP_AUTHOR = "Ovie Zeus"
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 
 REGISTRY_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REGISTRY_RUN_VALUE = APP_NAME
@@ -72,6 +72,7 @@ MASTER_CATEGORIES = (
     "Audio",
     "Archives",
     "Installers",
+    "PowerPoints",
     "Folders",
     "Others",
 )
@@ -94,6 +95,7 @@ FILE_CATEGORIES = {
         ".vue", ".svelte", ".astro",
         ".makefile", ".dockerfile", ".cmake",
     ),
+    "PowerPoints": (".ppt", ".pptx", ".pptm", ".ppsx", ".ppsm", ".potx", ".potm"),
     "Design": (
         ".psd", ".ai", ".sketch", ".fig",
         ".xd", ".ae", ".aep",
@@ -102,7 +104,7 @@ FILE_CATEGORIES = {
         ".eps", ".svg", ".indd", ".idml",
         ".dwg", ".dxf", ".stl",
     ),
-    "Documents": (".pdf", ".docx", ".doc", ".txt", ".xlsx", ".pptx", ".csv"),
+    "Documents": (".pdf", ".docx", ".doc", ".txt", ".xlsx", ".csv"),
     "Images": (".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".bmp"),
     "Videos": (".mp4", ".mkv", ".avi", ".mov", ".flv", ".wmv"),
     "Audio": (".mp3", ".wav", ".flac", ".m4a", ".aac"),
@@ -722,8 +724,19 @@ def main():
         run_uninstaller()
         return
 
+    if "--log" in sys.argv:
+        log_path = os.path.join(get_launch_dir(), "organizer.log")
+        if os.path.exists(log_path):
+            os.startfile(log_path)
+        return
+
     launch_dir = get_launch_dir()
     script_name = get_script_name()
+
+    log_path = os.path.join(launch_dir, "organizer.log")
+    fh = logging.FileHandler(log_path, mode="a", encoding="utf-8")
+    fh.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
+    logging.getLogger().addHandler(fh)
 
     show_splash_screen()
     set_registry_autostart()
