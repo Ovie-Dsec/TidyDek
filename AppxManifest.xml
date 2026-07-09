@@ -9,7 +9,7 @@
   <Identity
     Name="YourCompany.TidyDek"
     Publisher="CN=YourWindowsDeveloperPublisherID"
-    Version="1.4.4.0"
+    Version="1.5.0.0"
     ProcessorArchitecture="x64" />
 
   <Properties>

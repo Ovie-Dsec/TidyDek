@@ -29,6 +29,8 @@ import psutil
 
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+import pystray
+from PIL import Image, ImageDraw
 
 # Hide the console window on Windows (PyInstaller windowed mode).
 if sys.platform == "win32":
@@ -41,7 +43,7 @@ if sys.platform == "win32":
 
 APP_NAME = "AutoFolderOrganizer"
 APP_AUTHOR = "Ovie Zeus"
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 
 REGISTRY_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REGISTRY_RUN_VALUE = APP_NAME
@@ -406,6 +408,36 @@ def is_inside_protected_directory(path, script_dir):
     return False
 
 
+# ─── File / Folder Stability Checks ────────────────────────────────────────
+
+
+def is_file_stable(filepath, interval=1.5):
+    """Return True if file size hasn't changed over the interval."""
+    try:
+        size1 = os.path.getsize(filepath)
+    except OSError:
+        return False
+    time.sleep(interval)
+    try:
+        size2 = os.path.getsize(filepath)
+    except OSError:
+        return False
+    return size1 == size2
+
+
+def is_folder_stable(folder_path, interval=10):
+    """Return True if no file in the folder was modified recently."""
+    try:
+        now = time.time()
+        for root, dirs, files in os.walk(folder_path):
+            for name in files:
+                if now - os.path.getmtime(os.path.join(root, name)) < interval:
+                    return False
+    except OSError:
+        return False
+    return True
+
+
 # ─── File Path Utilities ────────────────────────────────────────────────────
 
 
@@ -491,6 +523,9 @@ def move_user_folder(folder_path, script_dir, script_name):
     if folder_name == script_name:
         return
 
+    if not is_folder_stable(folder_path):
+        return
+
     folders_dir = os.path.join(script_dir, "Folders")
     os.makedirs(folders_dir, exist_ok=True)
 
@@ -557,6 +592,8 @@ class FileMoverHandler(FileSystemEventHandler):
         if filepath.lower().endswith((".tmp", ".crdownload", ".part")):
             return
         time.sleep(0.5)  # wait for write-stream to settle
+        if not is_file_stable(filepath):
+            return
         move_file(filepath, self.script_dir, self.script_name)
 
 
@@ -716,6 +753,30 @@ def send_to_daemon(directory):
     return False
 
 
+# ─── System Tray Icon ──────────────────────────────────────────────────────
+
+
+def create_tray_icon(launch_dir):
+    """Build a system-tray icon with an Exit menu item."""
+    img = Image.new("RGBA", (64, 64), (0, 120, 212, 255))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((8, 8, 56, 56), fill=(0, 90, 180, 255))
+    draw.text((16, 14), "TD", fill="white")
+
+    menu = pystray.Menu(
+        pystray.MenuItem("TidyDek is active", None, enabled=False),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Exit", lambda icon: icon.stop()),
+    )
+
+    return pystray.Icon(
+        "TidyDek",
+        img,
+        f"TidyDek — Monitoring: {launch_dir}",
+        menu,
+    )
+
+
 # ─── Entry Point ─────────────────────────────────────────────────────────────
 
 
@@ -769,15 +830,18 @@ def main():
     observer.start()
     observers.append({"dir": launch_dir, "observer": observer})
 
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        pass
+    icon = create_tray_icon(launch_dir)
+    icon.run(lambda i: i.notify("TidyDek is active", f"Monitoring: {launch_dir}"))
 
     for o in observers:
         o["observer"].stop()
         o["observer"].join()
+
+    if os.path.exists(PID_FILE):
+        try:
+            os.remove(PID_FILE)
+        except OSError:
+            pass
 
     logging.info("File organizer stopped.")
 
