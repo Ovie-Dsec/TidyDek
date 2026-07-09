@@ -41,7 +41,7 @@ if sys.platform == "win32":
 
 APP_NAME = "AutoFolderOrganizer"
 APP_AUTHOR = "Ovie Zeus"
-APP_VERSION = "1.0.3"
+APP_VERSION = "1.0.4"
 
 REGISTRY_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REGISTRY_RUN_VALUE = APP_NAME
@@ -117,25 +117,25 @@ FILE_CATEGORIES = {
 # ─── Helper Functions ───────────────────────────────────────────────────────
 
 
-def get_script_name():
-    """Return the basename of the current executable or script."""
-    if getattr(sys, "frozen", False):
-        return os.path.basename(sys.executable)
-    return os.path.basename(os.path.abspath(__file__))
-
-
-def get_launch_dir():
-    """
-    Return the directory containing the executable (frozen) or the
-    current working directory (script mode).
-    """
+def get_exe_path():
+    """Return the full path to the current executable/script."""
     if getattr(sys, "frozen", False):
         if sys.platform == "win32":
             buf = ctypes.create_unicode_buffer(260)
             ctypes.windll.kernel32.GetModuleFileNameW(None, buf, 260)
-            return os.path.dirname(buf.value)
-        return os.path.dirname(sys.executable)
-    return os.getcwd()
+            return buf.value
+        return sys.executable
+    return os.path.abspath(__file__)
+
+
+def get_script_name():
+    """Return the basename of the current executable or script."""
+    return os.path.basename(get_exe_path())
+
+
+def get_launch_dir():
+    """Return the directory containing the executable or script."""
+    return os.path.dirname(get_exe_path())
 
 
 # ─── Windows Registry Helpers ───────────────────────────────────────────────
@@ -357,7 +357,7 @@ def set_registry_autostart():
 
     import winreg
 
-    exe_path = sys.executable
+    exe_path = get_exe_path()
     try:
         reg_set_value(
             winreg.HKEY_CURRENT_USER,
