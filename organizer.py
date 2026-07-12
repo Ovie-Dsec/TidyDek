@@ -29,8 +29,7 @@ import psutil
 
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-import pystray
-from PIL import Image, ImageDraw
+import ctypes.wintypes
 
 # Hide the console window on Windows (PyInstaller windowed mode).
 if sys.platform == "win32":
@@ -43,7 +42,7 @@ if sys.platform == "win32":
 
 APP_NAME = "AutoFolderOrganizer"
 APP_AUTHOR = "Ovie Zeus"
-APP_VERSION = "1.0.5"
+APP_VERSION = "1.0.6"
 
 REGISTRY_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REGISTRY_RUN_VALUE = APP_NAME
@@ -151,8 +150,9 @@ def reg_set_value(root, key_path, name, value_type, value):
         key = winreg.CreateKeyEx(root, key_path, 0, winreg.KEY_SET_VALUE)
         winreg.SetValueEx(key, name, 0, value_type, value)
         winreg.CloseKey(key)
-    except Exception:
-        pass
+        logging.info(f"Registry write ok: {key_path}\\{name}")
+    except Exception as e:
+        logging.warning(f"Registry write failed: {key_path}\\{name} — {e}")
 
 
 def reg_get_value(root, key_path, name):
@@ -360,16 +360,13 @@ def set_registry_autostart():
     import winreg
 
     exe_path = get_exe_path()
-    try:
-        reg_set_value(
-            winreg.HKEY_CURRENT_USER,
-            REGISTRY_RUN_KEY,
-            REGISTRY_RUN_VALUE,
-            winreg.REG_SZ,
-            f'"{exe_path}"',
-        )
-    except Exception:
-        pass
+    reg_set_value(
+        winreg.HKEY_CURRENT_USER,
+        REGISTRY_RUN_KEY,
+        REGISTRY_RUN_VALUE,
+        winreg.REG_SZ,
+        f'"{exe_path}"',
+    )
 
 
 # ─── Recursion Guardrail ─────────────────────────────────────────────────────
@@ -753,28 +750,142 @@ def send_to_daemon(directory):
     return False
 
 
-# ─── System Tray Icon ──────────────────────────────────────────────────────
+# ─── Windows Tray Icon (Win32 API) ─────────────────────────────────────────
+
+NIM_ADD = 0
+NIM_DELETE = 2
+NIF_MESSAGE = 1
+NIF_ICON = 2
+NIF_TIP = 4
+WM_APP = 0x8000
+WM_RBUTTONUP = 0x205
+WM_COMMAND = 0x111
+WM_DESTROY = 2
+ID_EXIT = 1001
 
 
-def create_tray_icon(launch_dir):
-    """Build a system-tray icon with an Exit menu item."""
-    img = Image.new("RGBA", (64, 64), (0, 120, 212, 255))
-    draw = ImageDraw.Draw(img)
-    draw.rectangle((8, 8, 56, 56), fill=(0, 90, 180, 255))
-    draw.text((16, 14), "TD", fill="white")
+class NOTIFYICONDATAW(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", ctypes.c_ulong),
+        ("hWnd", ctypes.c_void_p),
+        ("uID", ctypes.c_uint),
+        ("uFlags", ctypes.c_uint),
+        ("uCallbackMessage", ctypes.c_uint),
+        ("hIcon", ctypes.c_void_p),
+        ("szTip", ctypes.c_wchar * 128),
+        ("dwState", ctypes.c_ulong),
+        ("dwStateMask", ctypes.c_ulong),
+        ("szInfo", ctypes.c_wchar * 256),
+        ("uVersion", ctypes.c_uint),
+        ("szInfoTitle", ctypes.c_wchar * 64),
+        ("dwInfoFlags", ctypes.c_ulong),
+        ("guidItem", ctypes.c_byte * 16),
+        ("hBalloonIcon", ctypes.c_void_p),
+    ]
 
-    menu = pystray.Menu(
-        pystray.MenuItem("TidyDek is active", None, enabled=False),
-        pystray.Menu.SEPARATOR,
-        pystray.MenuItem("Exit", lambda icon: icon.stop()),
+
+_TRAY_WNDPROC = ctypes.WINFUNCTYPE(
+    ctypes.c_long,
+    ctypes.c_void_p, ctypes.c_uint, ctypes.c_void_p, ctypes.c_void_p,
+)
+
+
+@_TRAY_WNDPROC
+def _on_tray_msg(hwnd, msg, wparam, lparam):
+    """Window procedure for the hidden tray window."""
+    if msg == WM_APP:
+        if lparam == WM_RBUTTONUP:
+            hmenu = ctypes.windll.user32.CreatePopupMenu()
+            ctypes.windll.user32.AppendMenuW(hmenu, 0x1 | 0x2, 0, "TidyDek is active")
+            ctypes.windll.user32.AppendMenuW(hmenu, 0x800, 0, None)
+            ctypes.windll.user32.AppendMenuW(hmenu, 0, ID_EXIT, "Exit")
+            pt = ctypes.wintypes.POINT()
+            ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
+            ctypes.windll.user32.TrackPopupMenu(hmenu, 0, pt.x, pt.y, 0, hwnd, None)
+            ctypes.windll.user32.DestroyMenu(hmenu)
+            return 0
+    elif msg == WM_COMMAND:
+        if wparam & 0xFFFF == ID_EXIT:
+            ctypes.windll.user32.DestroyWindow(hwnd)
+            return 0
+    elif msg == WM_DESTROY:
+        ctypes.windll.user32.PostQuitMessage(0)
+        return 0
+    return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+
+
+def _load_tray_hicon():
+    """Load the tray icon from bundled resource, or fall back to default."""
+    if getattr(sys, "frozen", False):
+        path = os.path.join(sys._MEIPASS, "autosort.ico")
+    else:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "autosort.ico")
+    if os.path.exists(path):
+        hicon = ctypes.windll.user32.LoadImageW(0, path, 1, 32, 32, 0x00000010)
+        if hicon:
+            return hicon
+    return ctypes.windll.user32.LoadIconW(0, 32512)
+
+
+def run_tray_icon(launch_dir):
+    """Create tray icon and run message loop. Blocks until Exit is clicked."""
+    hinst = ctypes.windll.kernel32.GetModuleHandleW(None)
+    class_name = "TidyDekTray"
+
+    # Register window class
+    wc = ctypes.wintypes.WNDCLASSW()
+    wc.style = 0
+    wc.lpfnWndProc = ctypes.cast(_on_tray_msg, ctypes.c_void_p).value
+    wc.cbClsExtra = 0
+    wc.cbWndExtra = 0
+    wc.hInstance = hinst
+    wc.hIcon = 0
+    wc.hCursor = 0
+    wc.hbrBackground = 0
+    wc.lpszMenuName = None
+    wc.lpszClassName = class_name
+
+    if not ctypes.windll.user32.RegisterClassW(ctypes.byref(wc)):
+        return
+
+    # Create message-only window
+    hwnd = ctypes.windll.user32.CreateWindowExW(
+        0, class_name, "", 0,
+        0, 0, 0, 0,
+        -3,  # HWND_MESSAGE
+        0, hinst, None,
     )
+    if not hwnd:
+        return
 
-    return pystray.Icon(
-        "TidyDek",
-        img,
-        f"TidyDek — Monitoring: {launch_dir}",
-        menu,
-    )
+    hicon = _load_tray_hicon()
+
+    nid = NOTIFYICONDATAW()
+    nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
+    nid.hWnd = hwnd
+    nid.uID = 1
+    nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
+    nid.uCallbackMessage = WM_APP
+    nid.hIcon = hicon
+    nid.szTip = f"TidyDek — Monitoring: {launch_dir}"
+
+    ctypes.windll.shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
+
+    # Message loop
+    msg = ctypes.wintypes.MSG()
+    while True:
+        ret = ctypes.windll.user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
+        if ret <= 0:
+            break
+        ctypes.windll.user32.TranslateMessage(ctypes.byref(msg))
+        ctypes.windll.user32.DispatchMessageW(ctypes.byref(msg))
+
+    # Cleanup
+    ctypes.windll.shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
+    if hicon:
+        ctypes.windll.user32.DestroyIcon(hicon)
+    ctypes.windll.user32.DestroyWindow(hwnd)
 
 
 # ─── Entry Point ─────────────────────────────────────────────────────────────
@@ -830,8 +941,8 @@ def main():
     observer.start()
     observers.append({"dir": launch_dir, "observer": observer})
 
-    icon = create_tray_icon(launch_dir)
-    icon.run(lambda i: i.notify("TidyDek is active", f"Monitoring: {launch_dir}"))
+    logging.info("Tray icon active — right-click for Exit")
+    run_tray_icon(launch_dir)
 
     for o in observers:
         o["observer"].stop()
