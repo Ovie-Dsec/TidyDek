@@ -42,7 +42,7 @@ if sys.platform == "win32":
 
 APP_NAME = "AutoFolderOrganizer"
 APP_AUTHOR = "Ovie Zeus"
-APP_VERSION = "1.0.6"
+APP_VERSION = "1.0.7"
 
 REGISTRY_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REGISTRY_RUN_VALUE = APP_NAME
@@ -833,8 +833,22 @@ def run_tray_icon(launch_dir):
     hinst = ctypes.windll.kernel32.GetModuleHandleW(None)
     class_name = "TidyDekTray"
 
+    class _WNDCLASSW(ctypes.Structure):
+        _fields_ = [
+            ("style", ctypes.c_uint),
+            ("lpfnWndProc", ctypes.c_void_p),
+            ("cbClsExtra", ctypes.c_int),
+            ("cbWndExtra", ctypes.c_int),
+            ("hInstance", ctypes.c_void_p),
+            ("hIcon", ctypes.c_void_p),
+            ("hCursor", ctypes.c_void_p),
+            ("hbrBackground", ctypes.c_void_p),
+            ("lpszMenuName", ctypes.c_wchar_p),
+            ("lpszClassName", ctypes.c_wchar_p),
+        ]
+
     # Register window class
-    wc = ctypes.wintypes.WNDCLASSW()
+    wc = _WNDCLASSW()
     wc.style = 0
     wc.lpfnWndProc = ctypes.cast(_on_tray_msg, ctypes.c_void_p).value
     wc.cbClsExtra = 0
