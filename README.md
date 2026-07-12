@@ -38,7 +38,7 @@ TidyDek requires `broadFileSystemAccess` to move files on your behalf. All file 
 
 ```batch
 pip install -r requirements.txt
-pyinstaller --onefile --windowed --icon=autosort.ico --name=TidyDek organizer.py
+pyinstaller --onefile --windowed --icon=autosort.ico --add-data "autosort.ico;." --name=TidyDek organizer.py
 ```
 
 Output: `dist\TidyDek.exe`
