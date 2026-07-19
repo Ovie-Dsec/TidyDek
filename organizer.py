@@ -42,7 +42,7 @@ if sys.platform == "win32":
 
 APP_NAME = "AutoFolderOrganizer"
 APP_AUTHOR = "Ovie Zeus"
-APP_VERSION = "1.0.8"
+APP_VERSION = "1.0.9"
 
 REGISTRY_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REGISTRY_RUN_VALUE = APP_NAME
@@ -677,9 +677,9 @@ def acquire_single_instance():
     Ensure only one instance of the application runs at a time.
 
     Uses a PID file with ``O_CREAT | O_EXCL`` for atomic acquisition.
-    If a stale lock file is found (process no longer alive), it is
-    silently cleaned up and a fresh lock is created — enabling
-    infinite restart self-healing.
+    If a stale lock file is found (process no longer alive or PID
+    reused by a different executable), it is cleaned up and a fresh
+    lock is created — enabling infinite restart self-healing.
 
     Returns ``True`` if this is the only instance, ``False`` otherwise.
     On non-Windows platforms always returns ``True``.
@@ -693,15 +693,30 @@ def acquire_single_instance():
             with open(PID_FILE, "r") as f:
                 pid = int(f.read().strip())
 
+            proc = None
             if psutil.pid_exists(pid):
                 try:
                     proc = psutil.Process(pid)
-                    if proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE:
-                        return False
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass  # can't access → stale, fall through
+                    pass
 
-            # Process is dead or unreachable — discard stale lock
+            if proc is not None and proc.is_running():
+                try:
+                    # Verify the process is actually TidyDek, not a PID-reuse
+                    # impostor (e.g. Chrome, explorer.exe that inherited the
+                    # same PID number after TidyDek crashed).
+                    exe = proc.exe()
+                    our_exe = get_exe_path()
+                    same = os.path.normpath(exe).lower() == os.path.normpath(our_exe).lower()
+                    if same and proc.status() != psutil.STATUS_ZOMBIE:
+                        logging.info(f"PID {pid} is a live TidyDek instance — single-instance guard active")
+                        return False
+                    if not same:
+                        logging.info(f"Stale PID file: stored PID {pid} belongs to {exe}, not TidyDek — removing")
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+
+            # Process is dead or is not TidyDek — discard stale lock
             try:
                 os.remove(PID_FILE)
             except OSError:
