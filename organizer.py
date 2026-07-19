@@ -42,7 +42,7 @@ if sys.platform == "win32":
 
 APP_NAME = "AutoFolderOrganizer"
 APP_AUTHOR = "Ovie Zeus"
-APP_VERSION = "1.0.7"
+APP_VERSION = "1.0.8"
 
 REGISTRY_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REGISTRY_RUN_VALUE = APP_NAME
@@ -828,8 +828,15 @@ def _load_tray_hicon():
     return ctypes.windll.user32.LoadIconW(0, 32512)
 
 
+ERROR_CLASS_ALREADY_EXISTS = 1410
+
+
 def run_tray_icon(launch_dir):
-    """Create tray icon and run message loop. Blocks until Exit is clicked."""
+    """
+    Create tray icon and run message loop.
+    Blocks until Exit is clicked.
+    Returns (rather than raises) on failure so the daemon keeps running.
+    """
     hinst = ctypes.windll.kernel32.GetModuleHandleW(None)
     class_name = "TidyDekTray"
 
@@ -861,7 +868,10 @@ def run_tray_icon(launch_dir):
     wc.lpszClassName = class_name
 
     if not ctypes.windll.user32.RegisterClassW(ctypes.byref(wc)):
-        return
+        err = ctypes.windll.kernel32.GetLastError()
+        if err != ERROR_CLASS_ALREADY_EXISTS:
+            logging.warning(f"RegisterClassW failed (error {err}) — tray icon unavailable")
+        # If the class already exists we can still create the window below
 
     # Create message-only window
     hwnd = ctypes.windll.user32.CreateWindowExW(
@@ -871,7 +881,9 @@ def run_tray_icon(launch_dir):
         0, hinst, None,
     )
     if not hwnd:
-        return
+        err = ctypes.windll.kernel32.GetLastError()
+        logging.warning(f"CreateWindowExW failed (error {err}) — tray icon unavailable")
+        return False
 
     hicon = _load_tray_hicon()
 
@@ -884,7 +896,13 @@ def run_tray_icon(launch_dir):
     nid.hIcon = hicon
     nid.szTip = f"TidyDek — Monitoring: {launch_dir}"
 
-    ctypes.windll.shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
+    if not ctypes.windll.shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid)):
+        err = ctypes.windll.kernel32.GetLastError()
+        logging.warning(f"Shell_NotifyIconW failed (error {err}) — tray icon unavailable")
+        ctypes.windll.user32.DestroyWindow(hwnd)
+        return False
+
+    logging.info("Tray icon created — right-click for Exit")
 
     # Message loop
     msg = ctypes.wintypes.MSG()
@@ -900,6 +918,7 @@ def run_tray_icon(launch_dir):
     if hicon:
         ctypes.windll.user32.DestroyIcon(hicon)
     ctypes.windll.user32.DestroyWindow(hwnd)
+    return True
 
 
 # ─── Entry Point ─────────────────────────────────────────────────────────────
@@ -956,19 +975,21 @@ def main():
     observers.append({"dir": launch_dir, "observer": observer})
 
     logging.info("Tray icon active — right-click for Exit")
-    run_tray_icon(launch_dir)
-
-    for o in observers:
-        o["observer"].stop()
-        o["observer"].join()
-
-    if os.path.exists(PID_FILE):
-        try:
-            os.remove(PID_FILE)
-        except OSError:
-            pass
-
-    logging.info("File organizer stopped.")
+    if run_tray_icon(launch_dir):
+        # Message loop ran and Exit was clicked — clean shutdown
+        for o in observers:
+            o["observer"].stop()
+            o["observer"].join()
+        if os.path.exists(PID_FILE):
+            try:
+                os.remove(PID_FILE)
+            except OSError:
+                pass
+        logging.info("File organizer stopped.")
+    else:
+        # Tray icon creation failed (already logged).
+        # Daemon threads keep running; process stays alive until killed.
+        logging.info("Running in headless mode (no tray icon)")
 
 
 # ─── CLI Entry ───────────────────────────────────────────────────────────────
