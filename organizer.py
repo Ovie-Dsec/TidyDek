@@ -42,7 +42,7 @@ if sys.platform == "win32":
 
 APP_NAME = "AutoFolderOrganizer"
 APP_AUTHOR = "Ovie Zeus"
-APP_VERSION = "1.0.9"
+APP_VERSION = "1.0.10"
 
 REGISTRY_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REGISTRY_RUN_VALUE = APP_NAME
@@ -1003,8 +1003,10 @@ def main():
         logging.info("File organizer stopped.")
     else:
         # Tray icon creation failed (already logged).
-        # Daemon threads keep running; process stays alive until killed.
+        # Block the main thread so daemon processes (watchdog, IPC server) stay alive.
         logging.info("Running in headless mode (no tray icon)")
+        while True:
+            time.sleep(3600)
 
 
 # ─── CLI Entry ───────────────────────────────────────────────────────────────
