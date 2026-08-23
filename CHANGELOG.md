@@ -4,6 +4,28 @@ All notable changes to TidyDek are documented here.
 The format follows Keep a Changelog; versioning follows Semantic Versioning.
 The Single Source of Truth for the current version is `src/version.py`.
 
+## [2.1.0] - 2026-08-23
+
+Hardening release on the v2 platform; prepares the plugin API surface for v2.1 consumers.
+
+### Added
+- Telemetry zip-bomb guard: packaged diagnostics tail-cap every file at
+  2 MiB (trimmed forward to a line boundary), bounding archive size
+  regardless of log growth; verified against a 10 MB hostile log.
+- First Run Experience: a welcome placeholder replaces the preview pane when
+  no saved config exists, dismissed permanently by the first successful scan
+  (persisted via a marker file so it survives restarts); cancelled or failed
+  scans never dismiss it.
+- Plugin contract surface (src/core/plugin_contract.py): frozen FileEvent
+  and ScanSummary payloads plus a runtime-checkable PluginContext protocol
+  exposing read-only scan-rule views and structured emit_log routing.
+  Import isolation (no UI/ctypes/integrations) is enforced by AST tests;
+  the dispatch loader arrives in v2.1 consumers.
+
+### Changed
+- Version advanced to 2.1.0 in src/version.py (SSOT) to reflect feature
+  additions ahead of any release tag.
+
 ## [2.0.0] - 2026-08-23
 
 > **Architectural ground-up rebuild. Supersedes the legacy v1.0.x line.
