@@ -14,6 +14,15 @@ def test_version_is_semver_and_name_nonempty():
     assert APP_NAME.strip() != ""
 
 
+def test_version_py_layout_contract_for_ispp():
+    """ISPP consumes lines 1-2 verbatim; nothing may precede the markers."""
+    lines = (ROOT / "src" / "version.py").read_text(encoding="utf-8").splitlines()
+    assert lines[0].startswith('APP_NAME = "'), lines[0]
+    assert lines[1].startswith('VERSION = "'), lines[1]
+    # And the values must equal what a real import produces.
+    assert APP_NAME in lines[0] and VERSION in lines[1]
+
+
 def test_pyproject_derives_version_dynamically_from_version_module():
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = data["project"]
