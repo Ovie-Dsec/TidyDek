@@ -73,6 +73,17 @@ class MainWindow(ctk.CTk):
         self._preview.configure(state="disabled")
         self._preview.grid(row=3, column=0, sticky="nsew", padx=12, pady=4)
 
+        # Phase 19.2 FRE placeholder: occupies the preview cell until the
+        # first successful scan dismisses it. Purely presentational.
+        self._welcome_label = ctk.CTkLabel(
+            self,
+            text=("Welcome to TidyDek\n\n"
+                  "Click \"Open Folder...\" above to scan and tidy a folder."),
+            justify="center",
+        )
+        self._welcome_label.grid(row=3, column=0, sticky="nsew", padx=12, pady=4)
+        self._welcome_label.grid_remove()
+
         self._status_label = ctk.CTkLabel(
             self, textvariable=self._status_var, anchor="w"
         )
@@ -97,6 +108,7 @@ class MainWindow(ctk.CTk):
             tuple(f["path"] for f in s["files"]),
             s["selected_index"],
             s["preview_text"],
+            s.get("first_run", False),
         )
         if key == self._rendered:
             return
@@ -134,6 +146,16 @@ class MainWindow(ctk.CTk):
         self._preview.delete("1.0", "end")
         self._preview.insert("1.0", s["preview_text"])
         self._preview.configure(state="disabled")
+
+        # FRE visibility (Phase 19.2): welcome label replaces the preview
+        # pane until the first successful scan completes.
+        fre = bool(s.get("first_run"))
+        if fre:
+            self._preview.grid_remove()
+            self._welcome_label.grid()
+        else:
+            self._welcome_label.grid_remove()
+            self._preview.grid()
 
     # ---- intents -----------------------------------------------------------
     def _choose_folder(self) -> None:

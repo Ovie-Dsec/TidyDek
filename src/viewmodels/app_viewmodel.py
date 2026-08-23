@@ -17,6 +17,7 @@ completion without a UI timer.
 from __future__ import annotations
 
 import queue
+import sys
 import threading
 import time
 from pathlib import Path
@@ -37,7 +38,21 @@ DEFAULT_STATE: dict[str, Any] = {
     "busy": False,           # bool: True while a command is running
     "scan_count": 0,         # int: files discovered so far in the active scan
     "scan_current": "",      # str: most recent path reported by the worker
+    "first_run": False,      # bool: FRE active until first successful scan
 }
+
+
+def is_first_run(config_path: Path | None, marker_path: Path) -> bool:
+    """FRE triggers when no saved config exists and no dismissal is recorded.
+
+    The marker file makes the dismissal permanent across restarts even if
+    the user never explicitly saves settings (a successful scan writes it).
+    """
+    if marker_path.exists():
+        return False
+    if config_path is None:
+        return False
+    return not Path(config_path).exists()
 
 
 class AppViewModel:
@@ -49,14 +64,20 @@ class AppViewModel:
         *,
         parser_extensions: Iterable[str] = (".txt",),
         scan_rules: ScanRules | None = None,
+        first_run: bool = False,
+        on_first_scan_completed: Optional[Callable[[], None]] = None,
     ) -> None:
         self._store = store
         self._parser_extensions = tuple(parser_extensions)
         self._scan_rules = scan_rules
+        self._first_run_active = bool(first_run)
+        self._on_first_scan_completed = on_first_scan_completed
         self._scan_queue: Optional["queue.Queue[ScanProgress]"] = None
         self._worker: Optional[ScanWorker] = None
         self._idle_event = threading.Event()
-        store.replace(dict(DEFAULT_STATE))
+        seed = dict(DEFAULT_STATE)
+        seed["first_run"] = self._first_run_active
+        store.replace(seed)
 
     # ---- View-facing observation surface ------------------------------
     def subscribe(self, listener: Listener) -> Callable[[], None]:
@@ -187,6 +208,16 @@ class AppViewModel:
             else:
                 updates["status"] = f"Loaded {terminal.files_scanned} file(s)."
                 updates["files"] = list(terminal.results)
+                if self._first_run_active:
+                    # Phase 19.2: the first SUCCESSFUL scan ends FRE forever.
+                    updates["first_run"] = False
+                    self._first_run_active = False
+                    callback = self._on_first_scan_completed
+                    if callback is not None:
+                        try:
+                            callback()
+                        except Exception as exc:
+                            sys.stderr.write(f"FRE callback error: {exc!r}\n")
             self._store.update_many(updates)
             self._idle_event.set()
         return had_events

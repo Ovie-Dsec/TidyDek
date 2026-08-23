@@ -70,7 +70,7 @@ from src.integrations.crash_reporter import confirm  # noqa: E402
 from src.integrations.system_tray import SystemTrayIcon  # noqa: E402
 from src.integrations.updater import UpdateError, Updater  # noqa: E402
 from src.version import APP_NAME, VERSION  # noqa: E402
-from src.viewmodels.app_viewmodel import AppViewModel  # noqa: E402
+from src.viewmodels.app_viewmodel import AppViewModel, is_first_run  # noqa: E402
 from src.viewmodels.settings_viewmodel import (  # noqa: E402
     SettingsViewModel,
     default_config_path,
@@ -98,8 +98,33 @@ def main() -> None:
         _logger.warning("invalid scan rules in settings; defaults used: %r", exc)
         scan_rules = ScanRules()
 
+    # First Run Experience (Phase 19.2): trigger on missing saved config;
+    # dismissal becomes permanent once the first successful scan completes.
+    fre_marker = (
+        Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
+        / "TidyDek"
+        / ".first_run_complete"
+    )
+
+    def mark_first_run_complete() -> None:
+        try:
+            fre_marker.parent.mkdir(parents=True, exist_ok=True)
+            fre_marker.write_text("dismissed", encoding="utf-8")
+            _logger.info("FRE dismissed (first successful scan)")
+        except OSError as exc:
+            _logger.warning("could not persist FRE dismissal: %s", exc)
+
+    first_run = is_first_run(config.path, fre_marker)
+    if first_run:
+        _logger.info("first run detected")
+
     store = StateStore()
-    view_model = AppViewModel(store, scan_rules=scan_rules)
+    view_model = AppViewModel(
+        store,
+        scan_rules=scan_rules,
+        first_run=first_run,
+        on_first_scan_completed=mark_first_run_complete,
+    )
     window = MainWindow(view_model)
     window.title(f"{APP_NAME} v{VERSION}")
 
