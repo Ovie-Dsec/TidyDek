@@ -38,7 +38,25 @@ from .win32_api import (
 ExitFn = Callable[[int], None]
 SUPPORT_EMAIL = "support@tidydek.com"
 _startfile = os.startfile  # module-level seam for test monkeypatching
+
+# Phase 19.1 zip-bomb guard: no single packaged file contributes more than
+# this many bytes (tail-retained), bounding archive growth regardless of log
+# rotation misconfiguration or hostile files planted in the log directory.
+MAX_LOG_BYTES_PER_FILE = 2 * 1024 * 1024
+
 _logger = get_logger("crash")
+
+
+def _tail(path: Path, limit: int) -> bytes:
+    """Last ``limit`` bytes of ``path``, trimmed forward to a line boundary."""
+    size = path.stat().st_size
+    with path.open("rb") as handle:
+        if size <= limit:
+            return handle.read()
+        handle.seek(size - limit)
+        data = handle.read()
+    newline = data.find(b"\n")
+    return data[newline + 1:] if newline != -1 else data
 
 
 def _write_report(report_dir: Path, exc_text: str, thread_label: str) -> Path:
@@ -63,7 +81,7 @@ def _package_diagnostics(
     report_dir: Optional[Path],
     logs_dir: Optional[Path],
 ) -> Optional[Path]:
-    """Zip crash reports + recent logs; returns the archive path or None."""
+    """Zip crash reports + logs; every file tail-capped to the guard limit."""
     base = report_dir.parent if report_dir else Path.cwd()
     zip_path = base / f"TidyDek_diagnostics_{get_session_id()[:8]}.zip"
     try:
@@ -72,8 +90,12 @@ def _package_diagnostics(
                 if directory is None or not directory.is_dir():
                     continue
                 for file in sorted(directory.rglob("*")):
-                    if file.is_file():
-                        bundle.write(file, file.name)
+                    if not file.is_file():
+                        continue
+                    payload = _tail(file, MAX_LOG_BYTES_PER_FILE)
+                    if not payload:
+                        continue
+                    bundle.writestr(file.name, payload)
         return zip_path if zip_path.stat().st_size > 0 else None
     except OSError as exc:
         _logger.warning("diagnostics packaging failed: %s", exc)
