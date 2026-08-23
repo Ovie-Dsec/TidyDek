@@ -6,23 +6,26 @@
 
 #define AppVersionSrc "..\src\version.py"
 
+; ISPP FileRead is line-oriented: line 1 carries APP_NAME, line 2 VERSION
+; (layout contract enforced by tests/test_version_ssot.py).
 #define VerHandle FileOpen(AppVersionSrc)
-#define VerSource FileRead(VerHandle)
+#define NameLine FileRead(VerHandle)
+#define VersionLine FileRead(VerHandle)
 
 #define NameMarker 'APP_NAME = "'
-#define NameStart Pos(NameMarker, VerSource)
+#define NameStart Pos(NameMarker, NameLine)
 #if NameStart == 0
-  #error 'APP_NAME = "..."' marker not found in src/version.py
+  #error 'APP_NAME = "..."' marker not found on line 1 of src/version.py
 #endif
-#define NameBody Copy(VerSource, NameStart + Len(NameMarker), Len(VerSource))
+#define NameBody Copy(NameLine, NameStart + Len(NameMarker), Len(NameLine))
 #define AppName Trim(Copy(NameBody, 1, Pos('"', NameBody) - 1))
 
 #define VersionMarker 'VERSION = "'
-#define VersionStart Pos(VersionMarker, VerSource)
+#define VersionStart Pos(VersionMarker, VersionLine)
 #if VersionStart == 0
-  #error 'VERSION = "..."' marker not found in src/version.py
+  #error 'VERSION = "..."' marker not found on line 2 of src/version.py
 #endif
-#define VersionBody Copy(VerSource, VersionStart + Len(VersionMarker), Len(VerSource))
+#define VersionBody Copy(VersionLine, VersionStart + Len(VersionMarker), Len(VersionLine))
 #define AppVersion Trim(Copy(VersionBody, 1, Pos('"', VersionBody) - 1))
 
 [Setup]
