@@ -1,0 +1,45 @@
+name: Build, Test, and Package TidyDek
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-and-package:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install pyinstaller
+
+      - name: Run Automated Test Suite
+        run: python -m pytest tests/ -v
+
+      - name: Build Executable (PyInstaller)
+        run: python build.py --skip-tests --skip-installer
+
+      - name: Compile Inno Setup Installer (validates ISPP version parsing)
+        run: iscc "installer\TidyDek.iss"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: TidyDek-Build-Artifacts
+          if-no-files-found: error
+          path: |
+            dist/TidyDek.exe
+            installer/Output/TidyDek-setup-*.exe

@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+build/
+dist/
+*.spec
+installer/Output/
+.env
+
+# generated per-build (contains SSOT-stamped version); never commit
+assets/app.manifest
